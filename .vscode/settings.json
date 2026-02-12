@@ -1,0 +1,24 @@
+{
+    "cSpell.words": [
+        "attachs",
+        "devis",
+        "endforeach",
+        "frambuffer",
+        "freetype",
+        "glfw",
+        "glslc",
+        "intergrated",
+        "multisample",
+        "multisampling",
+        "rast",
+        "RENDERPASS",
+        "rendp",
+        "semp",
+        "semps",
+        "SPIR",
+        "Subpasses",
+        "swapchain"
+    ],
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true
+}
