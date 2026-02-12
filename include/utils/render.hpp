@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 
 namespace RenderUtils {
-void draw_rect(glm::vec2 position, glm::vec2 size);
+void draw_rect(glm::vec2 position, glm::vec2 size, glm::vec4 color);
 }
 
 #endif // UTILS_RENDER_HPP

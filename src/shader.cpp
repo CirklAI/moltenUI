@@ -30,8 +30,8 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 		return mod;
 	};
 
-	auto vCode = loadCode(vertPath + ".spv");
-	auto fCode = loadCode(fragPath + ".spv");
+	auto vCode = loadCode(vertPath + ".vert.spv");
+	auto fCode = loadCode(fragPath + ".frag.spv");
 	VkShaderModule vMod = createMod(vCode);
 	VkShaderModule fMod = createMod(fCode);
 
@@ -44,7 +44,8 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 	                                              .module = fMod,
 	                                              .pName = "main"}};
 
-	VkPushConstantRange push{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(float) * 4};
+	VkPushConstantRange push{
+	    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 32};
 	VkPipelineLayoutCreateInfo lci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 	                               .pushConstantRangeCount = 1,
 	                               .pPushConstantRanges = &push};
@@ -80,7 +81,12 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 	                                 .pColorBlendState = &cbs,
 	                                 .layout = layout,
 	                                 .renderPass = Init::renderPass};
-	vkCreateGraphicsPipelines(Init::device, nullptr, 1, &gpi, nullptr, &pipeline);
+
+	// FIX: Check result
+	VkResult result = vkCreateGraphicsPipelines(Init::device, nullptr, 1, &gpi, nullptr, &pipeline);
+	if(result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create graphics pipeline!");
+	}
 
 	vkDestroyShaderModule(Init::device, vMod, nullptr);
 	vkDestroyShaderModule(Init::device, fMod, nullptr);

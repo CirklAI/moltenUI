@@ -1,51 +1,60 @@
 #include "render.hpp"
+#include "components/input.hpp"
+#include "font.hpp"
 #include "init.hpp"
-#include "shader.hpp"
-#include <memory>
+#include "ui.hpp"
 
 namespace Render {
 std::unique_ptr<Shader> rectShader = nullptr;
+std::unique_ptr<FontRenderer> fontRenderer = nullptr;
 
 void draw_frame() {
-	if(!rectShader) {
-		rectShader = std::make_unique<Shader>("shaders/rect.vert", "shaders/rect.frag");
-	}
+	if(!rectShader) rectShader = std::make_unique<Shader>("shaders/rect", "shaders/rect");
+	if(!fontRenderer) fontRenderer = std::make_unique<FontRenderer>("assets/fonts/SF-Pro-Rounded-Regular.otf", 24);
 
 	vkWaitForFences(Init::device, 1, &Init::inFlightFences[Init::currentFrame], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
-	VkResult result =
+	VkResult res =
 	    vkAcquireNextImageKHR(Init::device, Init::vkbSwapchain.swapchain, UINT64_MAX,
 	                          Init::imageAvailableSemaphores[Init::currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-	if(result == VK_ERROR_OUT_OF_DATE_KHR) return;
+	if(res == VK_ERROR_OUT_OF_DATE_KHR) return;
 
 	vkResetFences(Init::device, 1, &Init::inFlightFences[Init::currentFrame]);
 	vkResetCommandBuffer(Init::commandBuffers[Init::currentFrame], 0);
 
+	VkCommandBuffer cmd = Init::commandBuffers[Init::currentFrame];
 	VkCommandBufferBeginInfo bi{.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-	vkBeginCommandBuffer(Init::commandBuffers[Init::currentFrame], &bi);
+	vkBeginCommandBuffer(cmd, &bi);
 
-	VkClearValue clear = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+	VkClearValue clearColor = {{{0.1f, 0.1f, 0.11f, 1.0f}}};
 	VkRenderPassBeginInfo rp{.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 	                         .renderPass = Init::renderPass,
 	                         .framebuffer = Init::framebuffers[imageIndex],
 	                         .renderArea = {{0, 0}, Init::vkbSwapchain.extent},
 	                         .clearValueCount = 1,
-	                         .pClearValues = &clear};
+	                         .pClearValues = &clearColor};
 
-	vkCmdBeginRenderPass(Init::commandBuffers[Init::currentFrame], &rp, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
 
-	rectShader->use(Init::commandBuffers[Init::currentFrame]);
+	Input::update();
+	glfwPollEvents();
 
-	float pc[4] = {0.0f, 0.0f, 0.5f, 0.5f};
-	vkCmdPushConstants(Init::commandBuffers[Init::currentFrame], rectShader->layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-	                   sizeof(pc), pc);
+	rectShader->use(cmd);
 
-	vkCmdDraw(Init::commandBuffers[Init::currentFrame], 6, 1, 0, 0);
+	static std::string buffer = "Type here...";
+	UI::Text("MoltenUI Debug", {20, 30}, {0.4f, 0.6f, 1.0f, 1.0f});
 
-	vkCmdEndRenderPass(Init::commandBuffers[Init::currentFrame]);
-	vkEndCommandBuffer(Init::commandBuffers[Init::currentFrame]);
+	if(UI::Button(0, {20, 60}, {100, 35}, "Clear")) {
+		buffer = "";
+	}
+
+	UI::InputField(1, buffer, {20, 110}, {250, 40});
+	UI::Text("Status: Active", {20, 170}, {0.5f, 0.5f, 0.5f, 1.0f});
+
+	vkCmdEndRenderPass(cmd);
+	vkEndCommandBuffer(cmd);
 
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo si{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -53,7 +62,7 @@ void draw_frame() {
 	                .pWaitSemaphores = &Init::imageAvailableSemaphores[Init::currentFrame],
 	                .pWaitDstStageMask = &waitStage,
 	                .commandBufferCount = 1,
-	                .pCommandBuffers = &Init::commandBuffers[Init::currentFrame],
+	                .pCommandBuffers = &cmd,
 	                .signalSemaphoreCount = 1,
 	                .pSignalSemaphores = &Init::renderFinishedSemaphores[Init::currentFrame]};
 
@@ -71,7 +80,8 @@ void draw_frame() {
 }
 
 void cleanup() {
+	vkDeviceWaitIdle(Init::device);
+	fontRenderer.reset();
 	rectShader.reset();
 }
-
 } // namespace Render
