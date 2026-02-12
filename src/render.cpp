@@ -38,7 +38,6 @@ void draw_frame() {
 
 	vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
 
-	Input::update();
 	glfwPollEvents();
 
 	rectShader->use(cmd);
@@ -52,6 +51,8 @@ void draw_frame() {
 
 	UI::InputField(1, buffer, {20, 110}, {250, 40});
 	UI::Text("Status: Active", {20, 170}, {0.5f, 0.5f, 0.5f, 1.0f});
+
+	Input::update();
 
 	vkCmdEndRenderPass(cmd);
 	vkEndCommandBuffer(cmd);

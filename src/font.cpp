@@ -41,7 +41,6 @@ FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 	                                .pPushConstantRanges = &push};
 	vkCreatePipelineLayout(Init::device, &plci, nullptr, &pipelineLayout);
 
-	// FIX: Load shaders from 'shaders' to match the build output
 	auto vCode = readFile("shaders/text.vert.spv");
 	auto fCode = readFile("shaders/text.frag.spv");
 	VkShaderModule vMod = createModule(vCode);

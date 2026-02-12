@@ -45,7 +45,7 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 	                                              .pName = "main"}};
 
 	VkPushConstantRange push{
-	    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 32};
+	    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 40};
 	VkPipelineLayoutCreateInfo lci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 	                               .pushConstantRangeCount = 1,
 	                               .pPushConstantRanges = &push};
@@ -82,7 +82,6 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 	                                 .layout = layout,
 	                                 .renderPass = Init::renderPass};
 
-	// FIX: Check result
 	VkResult result = vkCreateGraphicsPipelines(Init::device, nullptr, 1, &gpi, nullptr, &pipeline);
 	if(result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create graphics pipeline!");

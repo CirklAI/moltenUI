@@ -17,6 +17,7 @@ void update();
 
 bool is_key_down(int key);
 bool is_key_pressed(int key);
+bool is_alt_down();
 bool is_mouse_down(int button);
 bool is_mouse_pressed(int button);
 bool is_hovered(glm::vec2 pos, glm::vec2 size);

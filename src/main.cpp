@@ -2,6 +2,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 // clang-format on
+#include "components/input.hpp"
 #include "init.hpp"
 #include "render.hpp"
 #include "vk_mem_alloc.h"
@@ -22,6 +23,7 @@ int main() {
 		return -1;
 	}
 
+	Input::init(window);
 	Init::init_vulkan(TITLE, window);
 	while(!glfwWindowShouldClose(window)) {
 		glfwPollEvents();

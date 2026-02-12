@@ -29,6 +29,11 @@ bool is_key_down(int key) {
 bool is_key_pressed(int key) {
 	return keys[key] && !keysLast[key];
 }
+
+bool is_alt_down() {
+	return keys[GLFW_KEY_LEFT_ALT] || keys[GLFW_KEY_RIGHT_ALT];
+}
+
 bool is_mouse_down(int button) {
 	return mouseButtons[button];
 }
