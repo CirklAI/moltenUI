@@ -1,3 +1,4 @@
+#include "molten/theme.hpp"
 #include <ctime>
 #include <iostream>
 #include <molten/molten.hpp>
@@ -81,7 +82,7 @@ void demo() {
 	y += 45.0f;
 	UI::label("moltenUI", {col3_x + 15, y}, theme.colors.accent);
 	y += 24.0f;
-	UI::label_small("v1.0.0 - Vulkan UI", {col3_x + 15, y}, theme.colors.text_muted);
+	UI::label_small("v1.0.0 (Vulkan Backend)", {col3_x + 15, y}, theme.colors.text_muted);
 	y += 24.0f;
 	UI::separator({col3_x + 15, y}, col_w - 30);
 	y += 20.0f;
@@ -137,6 +138,7 @@ void demo() {
 
 int main() {
 	try {
+		UI::Theme::set_theme(UI::Theme::create_purple_theme());
 		Molten app("MoltenUI Demo", 1280, 720);
 		if(app.init() != 0) return 1;
 		return app.run(demo);

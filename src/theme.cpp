@@ -16,7 +16,7 @@ void set_theme(const ThemeData &theme) {
 ThemeData create_dark_theme() {
 	ThemeData t;
 	t.colors.background = {0.0f, 0.0f, 0.0f, 1.0f};
-	t.colors.surface = {0.05f, 0.05f, 0.05f, 1.0f};
+	t.colors.surface = {0.02f, 0.02f, 0.02f, 1.0f};
 	t.colors.surface_hover = {0.08f, 0.08f, 0.08f, 1.0f};
 	t.colors.surface_pressed = {0.03f, 0.03f, 0.03f, 1.0f};
 	t.colors.border = {0.15f, 0.15f, 0.15f, 1.0f};
