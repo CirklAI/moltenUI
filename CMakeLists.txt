@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(fetch_vk_bootstrap fetch_vma)
 
 include_directories(include)
 
-add_library(${LIB_NAME} 
+add_library(${LIB_NAME}
     src/lib.cpp
     src/init.cpp
     src/render.cpp
@@ -25,6 +25,8 @@ add_library(${LIB_NAME}
     src/ui.cpp
     src/components/input.cpp
     src/font.cpp
+    src/theme.cpp
+    src/vulkan_utils.cpp
 )
 
 target_include_directories(${LIB_NAME} PRIVATE
@@ -35,6 +37,7 @@ target_link_libraries(${LIB_NAME} PUBLIC Vulkan::Vulkan glfw vk-bootstrap::vk-bo
 
 add_executable(${EXE_NAME} demo/main.cpp)
 target_link_libraries(${EXE_NAME} PRIVATE ${LIB_NAME})
+target_include_directories(${EXE_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
 
 find_program(NAGA_EXECUTABLE naga)
 find_program(GLSLC_EXECUTABLE glslc)
@@ -46,6 +49,7 @@ endif()
 set(SHADER_FILES
     shaders/rect.wgsl
     shaders/text.wgsl
+    shaders/rounded_rect.wgsl
 )
 
 set(SHADER_BIN_DIR "$<TARGET_FILE_DIR:${EXE_NAME}>/shaders")

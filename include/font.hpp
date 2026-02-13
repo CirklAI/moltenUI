@@ -43,7 +43,7 @@ class FontRenderer {
 	VkDescriptorSetLayout descLayout;
 	VkDescriptorPool descPool;
 	static const int MAX_FRAMES = 3;
-	static const int MAX_CHARS_PER_FRAME = 256;
+	static const int MAX_CHARS_PER_FRAME = 1024;
 	VkBuffer uniformBuffers[MAX_FRAMES][MAX_CHARS_PER_FRAME];
 	VmaAllocation uniformAllocs[MAX_FRAMES][MAX_CHARS_PER_FRAME];
 	void *uniformMapped[MAX_FRAMES][MAX_CHARS_PER_FRAME];
