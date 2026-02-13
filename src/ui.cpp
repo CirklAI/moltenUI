@@ -1,5 +1,6 @@
 #include "molten/ui.hpp"
 #include "components/input.hpp"
+#include "font.hpp"
 #include "init.hpp"
 #include "render.hpp"
 #include <algorithm>
@@ -64,67 +65,46 @@ void InputField(int id, std::string &text, glm::vec2 pos, glm::vec2 size) {
 	glm::vec4 border = focused ? glm::vec4(0.3f, 0.5f, 1.0f, 1.0f)
 	                           : (hovered ? glm::vec4(0.4f, 0.4f, 0.45f, 1.0f) : glm::vec4(0.2f, 0.2f, 0.2f, 1.0f));
 
-	Render::draw_rect(pos.x - 1, pos.y - 1, size.x, size.y + 2, border);
+	Render::draw_rect(pos.x - 1, pos.y - 1, size.x + 2, size.y + 2, border);
 	Render::draw_rect(pos.x, pos.y, size.x, size.y, {0.05f, 0.05f, 0.05f, 1.0f});
 
-	float charWidth = 8.0f;
 	float textStart = pos.x + 10;
 	float maxWidth = size.x - 20;
 	std::string displayText = text.empty() ? "Type here..." : text;
 	glm::vec4 textColor = text.empty() ? glm::vec4(0.4f) : glm::vec4(0.9f);
-	float lineHeight = 20.0f;
-	int maxLines = std::max(1, (int)((size.y - 10) / lineHeight));
+	float lineHeight = Render::fontRenderer->get_line_height();
+	float textY = pos.y + (size.y - lineHeight) / 2.0f + lineHeight * 0.75f;
 
-	std::vector<std::string> lines;
-	std::string line;
-	float currentLineWidth = 0;
+	float textWidth = Render::fontRenderer->measure_text(displayText);
+	float &scrollX = state.inputStates[id].scrollOffset;
+	float cursorX = Render::fontRenderer->measure_text(displayText);
+	float visibleWidth = maxWidth;
+	float targetScrollX = 0.0f;
 
-	for(size_t i = 0; i < displayText.size(); i++) {
-		char c = displayText[i];
-		float charW = (c == ' ') ? charWidth * 0.5f : charWidth;
+	if(textWidth > visibleWidth) {
+		targetScrollX = cursorX - visibleWidth + 5;
+		targetScrollX = std::max(0.0f, std::min(targetScrollX, textWidth - visibleWidth));
+	}
 
-		if(c == '\n') {
-			lines.push_back(line);
-			line.clear();
-			currentLineWidth = 0;
-		} else if(currentLineWidth + charW > maxWidth && !line.empty()) {
-			size_t lastSpace = line.find_last_of(' ');
-			if(lastSpace != std::string::npos && lastSpace > 0 && i - line.length() + lastSpace < displayText.size()) {
-				lines.push_back(line.substr(0, lastSpace));
-				line = line.substr(lastSpace + 1) + c;
-				currentLineWidth = line.length() * charWidth;
-			} else {
-				lines.push_back(line);
-				line = std::string(1, c);
-				currentLineWidth = charW;
-			}
-		} else {
-			line += c;
-			currentLineWidth += charW;
+	scrollX += (targetScrollX - scrollX) * 0.3f;
+	if(std::abs(targetScrollX - scrollX) < 0.5f) {
+		scrollX = targetScrollX;
+	}
+
+	Render::set_scissor(textStart, pos.y, maxWidth, size.y);
+
+	float drawX = textStart - scrollX;
+	Text(displayText, {drawX, textY}, textColor);
+
+	if(focused) {
+		float cursorDrawX = textStart + cursorX - scrollX;
+		if(cursorDrawX >= textStart && cursorDrawX <= textStart + visibleWidth) {
+			float cursorY = pos.y + (size.y - lineHeight) / 2.0f;
+			Render::draw_rect(cursorDrawX, cursorY, 2, lineHeight, glm::vec4(1.0f));
 		}
 	}
-	if(!line.empty() || displayText == "Type here...") lines.push_back(line);
 
-	int scrollOffset = 0;
-	if((int)lines.size() > maxLines) {
-		scrollOffset = (int)lines.size() - maxLines;
-	}
-
-	float y = pos.y + 10;
-	for(int i = scrollOffset; i < std::min((int)lines.size(), scrollOffset + maxLines); i++) {
-		Text(lines[i], {textStart, y + lineHeight * 0.6f}, textColor);
-		y += lineHeight;
-	}
-
-	if(focused && !lines.empty()) {
-		int cursorLine = (int)lines.size() - 1 - scrollOffset;
-		if(cursorLine >= 0 && cursorLine < maxLines) {
-			const std::string &lastLine = lines.back();
-			float cursorX = textStart + lastLine.length() * charWidth;
-			float cursorY = pos.y + 10 + cursorLine * lineHeight + 2;
-			Render::draw_rect(cursorX, cursorY, 2, lineHeight - 6, glm::vec4(1.0f));
-		}
-	}
+	Render::reset_scissor();
 }
 
 } // namespace UI

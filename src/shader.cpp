@@ -61,13 +61,14 @@ Shader::Shader(const std::string &shaderPath) {
 	VkPipelineVertexInputStateCreateInfo vi{.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
 	VkPipelineInputAssemblyStateCreateInfo ia{.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 	                                          .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
-	VkViewport vp{0, 0, (float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height, 0, 1};
-	VkRect2D sc{{0, 0}, Init::vkbSwapchain.extent};
-	VkPipelineViewportStateCreateInfo vps{.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-	                                      .viewportCount = 1,
-	                                      .pViewports = &vp,
-	                                      .scissorCount = 1,
-	                                      .pScissors = &sc};
+
+	VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+	VkPipelineDynamicStateCreateInfo dynamicState{.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+	                                              .dynamicStateCount = 2,
+	                                              .pDynamicStates = dynamicStates};
+
+	VkPipelineViewportStateCreateInfo vps{
+	    .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1};
 	VkPipelineRasterizationStateCreateInfo rs{.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	                                          .cullMode = VK_CULL_MODE_NONE,
 	                                          .lineWidth = 1.0f};
@@ -86,6 +87,7 @@ Shader::Shader(const std::string &shaderPath) {
 	                                 .pRasterizationState = &rs,
 	                                 .pMultisampleState = &ms,
 	                                 .pColorBlendState = &cbs,
+	                                 .pDynamicState = &dynamicState,
 	                                 .layout = layout,
 	                                 .renderPass = Init::renderPass};
 

@@ -99,6 +99,11 @@ void draw_frame(std::function<void()> callback) {
 	                         .pClearValues = &clearColor};
 	vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
 
+	VkViewport viewport = {0, 0, (float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height, 0, 1};
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+	VkRect2D scissor = {{0, 0}, Init::vkbSwapchain.extent};
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+
 	for(int i = 0; i < MAX_FRAMES; i++) {
 		rectCounters[i] = 0;
 	}
@@ -151,6 +156,28 @@ void draw_rect(float x, float y, float w, float h, glm::vec4 color) {
 
 	vkCmdDraw(cmd, 6, 1, 0, 0);
 	rectCounters[frame]++;
+}
+
+void set_scissor(float x, float y, float w, float h) {
+	VkCommandBuffer cmd = Init::commandBuffers[Init::currentFrame];
+	glm::vec2 scale = Input::get_content_scale();
+
+	VkViewport viewport = {0, 0, (float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height, 0, 1};
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+	VkRect2D scissor = {.offset = {(int32_t)(x * scale.x), (int32_t)(y * scale.y)},
+	                    .extent = {(uint32_t)(w * scale.x), (uint32_t)(h * scale.y)}};
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
+
+void reset_scissor() {
+	VkCommandBuffer cmd = Init::commandBuffers[Init::currentFrame];
+
+	VkViewport viewport = {0, 0, (float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height, 0, 1};
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+	VkRect2D scissor = {.offset = {0, 0}, .extent = Init::vkbSwapchain.extent};
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
 void cleanup() {

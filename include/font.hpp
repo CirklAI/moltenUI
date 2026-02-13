@@ -20,6 +20,11 @@ class FontRenderer {
 	~FontRenderer();
 
 	void draw_text(VkCommandBuffer cmd, const std::string &text, glm::vec2 pos, glm::vec4 color);
+	float measure_text(const std::string &text);
+	float get_line_height() const {
+		return lineHeight;
+	}
+	const Glyph *get_glyph(char c) const;
 
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
@@ -30,6 +35,7 @@ class FontRenderer {
 
   private:
 	std::map<char, Glyph> glyphs;
+	float lineHeight;
 	VkImage atlasImage;
 	VmaAllocation atlasAllocation;
 	VkImageView atlasView;

@@ -106,13 +106,15 @@ FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 	VkPipelineVertexInputStateCreateInfo vi{.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
 	VkPipelineInputAssemblyStateCreateInfo ia{.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 	                                          .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
-	VkViewport vp{0, 0, (float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height, 0, 1};
-	VkRect2D sc{{0, 0}, Init::vkbSwapchain.extent};
-	VkPipelineViewportStateCreateInfo vps{.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-	                                      .viewportCount = 1,
-	                                      .pViewports = &vp,
-	                                      .scissorCount = 1,
-	                                      .pScissors = &sc};
+
+	// Dynamic viewport and scissor for text clipping
+	VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+	VkPipelineDynamicStateCreateInfo dynamicState{.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+	                                              .dynamicStateCount = 2,
+	                                              .pDynamicStates = dynamicStates};
+
+	VkPipelineViewportStateCreateInfo vps{
+	    .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1};
 	VkPipelineRasterizationStateCreateInfo rs{.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 	                                          .cullMode = VK_CULL_MODE_NONE,
 	                                          .lineWidth = 1.0f};
@@ -138,6 +140,7 @@ FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 	                                 .pRasterizationState = &rs,
 	                                 .pMultisampleState = &ms,
 	                                 .pColorBlendState = &cbs,
+	                                 .pDynamicState = &dynamicState,
 	                                 .layout = pipelineLayout,
 	                                 .renderPass = Init::renderPass};
 	VkResult result = vkCreateGraphicsPipelines(Init::device, nullptr, 1, &gpi, nullptr, &pipeline);
@@ -225,10 +228,11 @@ void FontRenderer::create_atlas(const std::string &path, uint32_t fontSize) {
 
 	FT_Set_Pixel_Sizes(face, 0, fontSize);
 
+	const uint32_t padding = 2;
 	uint32_t atlasW = 0, atlasH = 0;
 	for(unsigned char c = 32; c < 128; c++) {
 		FT_Load_Char(face, c, FT_LOAD_RENDER);
-		atlasW += face->glyph->bitmap.width;
+		atlasW += face->glyph->bitmap.width + padding;
 		atlasH = std::max(atlasH, (uint32_t)face->glyph->bitmap.rows);
 	}
 
@@ -246,6 +250,7 @@ void FontRenderer::create_atlas(const std::string &path, uint32_t fontSize) {
 	memset(pixels, 0, atlasW * atlasH);
 
 	uint32_t xOffset = 0;
+	lineHeight = 0;
 	for(unsigned char c = 32; c < 128; c++) {
 		FT_Load_Char(face, c, FT_LOAD_RENDER);
 		auto &bitmap = face->glyph->bitmap;
@@ -255,7 +260,8 @@ void FontRenderer::create_atlas(const std::string &path, uint32_t fontSize) {
 		glyphs[c] = {glm::vec2(bitmap.width, bitmap.rows), glm::vec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
 		             (uint32_t)face->glyph->advance.x >> 6,
 		             glm::vec4((float)xOffset / atlasW, 0, (float)bitmap.width / atlasW, (float)bitmap.rows / atlasH)};
-		xOffset += bitmap.width;
+		xOffset += bitmap.width + padding;
+		lineHeight = std::max(lineHeight, (float)bitmap.rows);
 	}
 	vmaUnmapMemory(Init::allocator, stagingAlloc);
 
@@ -360,4 +366,23 @@ void FontRenderer::reset_char_counter() {
 	for(int i = 0; i < MAX_FRAMES; i++) {
 		charCounters[i] = 0;
 	}
+}
+
+float FontRenderer::measure_text(const std::string &text) {
+	float width = 0;
+	for(char c : text) {
+		auto it = glyphs.find(c);
+		if(it != glyphs.end()) {
+			width += it->second.advance;
+		}
+	}
+	return width;
+}
+
+const Glyph *FontRenderer::get_glyph(char c) const {
+	auto it = glyphs.find(c);
+	if(it != glyphs.end()) {
+		return &it->second;
+	}
+	return nullptr;
 }
