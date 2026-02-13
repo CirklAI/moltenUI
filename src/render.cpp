@@ -5,13 +5,25 @@
 #include "shader.hpp"
 
 namespace Render {
+
 std::unique_ptr<Shader> rectShader = nullptr;
+std::unique_ptr<Shader> roundedRectShader = nullptr;
 std::unique_ptr<FontRenderer> fontRenderer = nullptr;
 
 struct RectUBO {
 	glm::vec2 pos;
 	glm::vec2 size;
 	glm::vec4 color;
+	glm::vec2 resolution;
+};
+
+struct RoundedRectUBO {
+	glm::vec2 pos;
+	glm::vec2 size;
+	glm::vec4 color;
+	float radius;
+	float border_width;
+	glm::vec4 border_color;
 	glm::vec2 resolution;
 };
 
@@ -25,9 +37,17 @@ VkDescriptorPool descPool;
 VkDescriptorSet descriptorSets[MAX_FRAMES][MAX_RECTS_PER_FRAME];
 int rectCounters[MAX_FRAMES] = {0, 0, 0};
 
+VkBuffer roundedUniformBuffers[MAX_FRAMES][MAX_RECTS_PER_FRAME];
+VmaAllocation roundedUniformAllocs[MAX_FRAMES][MAX_RECTS_PER_FRAME];
+void *roundedUniformMapped[MAX_FRAMES][MAX_RECTS_PER_FRAME];
+VkDescriptorPool roundedDescPool;
+VkDescriptorSet roundedDescriptorSets[MAX_FRAMES][MAX_RECTS_PER_FRAME];
+int roundedRectCounters[MAX_FRAMES] = {0, 0, 0};
+
 void init_resources() {
 	rectShader = std::make_unique<Shader>("shaders/rect");
-	fontRenderer = std::make_unique<FontRenderer>("assets/fonts/GoogleSans-Regular.ttf", 24);
+	roundedRectShader = std::make_unique<Shader>("shaders/rounded_rect");
+	fontRenderer = std::make_unique<FontRenderer>("assets/fonts/GoogleSans-Regular.ttf", 14);
 
 	for(int frame = 0; frame < MAX_FRAMES; frame++) {
 		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
@@ -72,6 +92,50 @@ void init_resources() {
 			vkUpdateDescriptorSets(Init::device, 1, &write, 0, nullptr);
 		}
 	}
+
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
+			VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			                       .size = sizeof(RoundedRectUBO),
+			                       .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT};
+			VmaAllocationCreateInfo aci{.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			                                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
+			                            .usage = VMA_MEMORY_USAGE_AUTO};
+			VmaAllocationInfo allocInfo;
+			vmaCreateBuffer(Init::allocator, &bci, &aci, &roundedUniformBuffers[frame][i],
+			                &roundedUniformAllocs[frame][i], &allocInfo);
+			roundedUniformMapped[frame][i] = allocInfo.pMappedData;
+		}
+	}
+
+	VkDescriptorPoolSize roundedPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	                                     .descriptorCount = MAX_FRAMES * MAX_RECTS_PER_FRAME};
+	VkDescriptorPoolCreateInfo roundedPci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+	                                      .maxSets = MAX_FRAMES * MAX_RECTS_PER_FRAME,
+	                                      .poolSizeCount = 1,
+	                                      .pPoolSizes = &roundedPoolSize};
+	vkCreateDescriptorPool(Init::device, &roundedPci, nullptr, &roundedDescPool);
+
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
+			VkDescriptorSetLayout layout = roundedRectShader->descSetLayout;
+			VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			                               .descriptorPool = roundedDescPool,
+			                               .descriptorSetCount = 1,
+			                               .pSetLayouts = &layout};
+			vkAllocateDescriptorSets(Init::device, &ai, &roundedDescriptorSets[frame][i]);
+
+			VkDescriptorBufferInfo bufferInfo{
+			    .buffer = roundedUniformBuffers[frame][i], .offset = 0, .range = sizeof(RoundedRectUBO)};
+			VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			                           .dstSet = roundedDescriptorSets[frame][i],
+			                           .dstBinding = 0,
+			                           .descriptorCount = 1,
+			                           .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			                           .pBufferInfo = &bufferInfo};
+			vkUpdateDescriptorSets(Init::device, 1, &write, 0, nullptr);
+		}
+	}
 }
 
 void draw_frame(std::function<void()> callback) {
@@ -106,6 +170,7 @@ void draw_frame(std::function<void()> callback) {
 
 	for(int i = 0; i < MAX_FRAMES; i++) {
 		rectCounters[i] = 0;
+		roundedRectCounters[i] = 0;
 	}
 	fontRenderer->reset_char_counter();
 
@@ -158,6 +223,37 @@ void draw_rect(float x, float y, float w, float h, glm::vec4 color) {
 	rectCounters[frame]++;
 }
 
+void draw_rounded_rect(float x, float y, float w, float h, float radius, glm::vec4 color) {
+	draw_rounded_rect_with_border(x, y, w, h, radius, 0.0f, color, color);
+}
+
+void draw_rounded_rect_with_border(float x, float y, float w, float h, float radius, float border_width,
+                                   glm::vec4 color, glm::vec4 border_color) {
+	VkCommandBuffer cmd = Init::commandBuffers[Init::currentFrame];
+	int frame = Init::currentFrame;
+
+	if(roundedRectCounters[frame] >= MAX_RECTS_PER_FRAME) return;
+
+	int idx = roundedRectCounters[frame];
+
+	roundedRectShader->use(cmd);
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, roundedRectShader->layout, 0, 1,
+	                        &roundedDescriptorSets[frame][idx], 0, nullptr);
+
+	glm::vec2 scale = Input::get_content_scale();
+	RoundedRectUBO *ubo = static_cast<RoundedRectUBO *>(roundedUniformMapped[frame][idx]);
+	ubo->pos = {x * scale.x, y * scale.y};
+	ubo->size = {w * scale.x, h * scale.y};
+	ubo->color = color;
+	ubo->radius = radius * scale.x;
+	ubo->border_width = border_width * scale.x;
+	ubo->border_color = border_color;
+	ubo->resolution = {(float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height};
+
+	vkCmdDraw(cmd, 6, 1, 0, 0);
+	roundedRectCounters[frame]++;
+}
+
 void set_scissor(float x, float y, float w, float h) {
 	VkCommandBuffer cmd = Init::commandBuffers[Init::currentFrame];
 	glm::vec2 scale = Input::get_content_scale();
@@ -184,11 +280,15 @@ void cleanup() {
 	vkDeviceWaitIdle(Init::device);
 	fontRenderer.reset();
 	rectShader.reset();
+	roundedRectShader.reset();
 	vkDestroyDescriptorPool(Init::device, descPool, nullptr);
+	vkDestroyDescriptorPool(Init::device, roundedDescPool, nullptr);
 	for(int frame = 0; frame < MAX_FRAMES; frame++) {
 		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
 			vmaDestroyBuffer(Init::allocator, uniformBuffers[frame][i], uniformAllocs[frame][i]);
+			vmaDestroyBuffer(Init::allocator, roundedUniformBuffers[frame][i], roundedUniformAllocs[frame][i]);
 		}
 	}
 }
+
 } // namespace Render

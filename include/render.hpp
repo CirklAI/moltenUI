@@ -5,11 +5,16 @@
 #include <glm/glm.hpp>
 
 namespace Render {
+
 extern std::unique_ptr<FontRenderer> fontRenderer;
 
 void draw_frame(std::function<void()> callback);
 void draw_rect(float x, float y, float w, float h, glm::vec4 color);
+void draw_rounded_rect(float x, float y, float w, float h, float radius, glm::vec4 color);
+void draw_rounded_rect_with_border(float x, float y, float w, float h, float radius, float border_width,
+                                   glm::vec4 color, glm::vec4 border_color);
 void set_scissor(float x, float y, float w, float h);
 void reset_scissor();
 void cleanup();
+
 } // namespace Render

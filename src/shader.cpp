@@ -45,7 +45,7 @@ Shader::Shader(const std::string &shaderPath) {
 	VkDescriptorSetLayoutBinding uboBinding{.binding = 0,
 	                                        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 	                                        .descriptorCount = 1,
-	                                        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT};
+	                                        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT};
 
 	VkDescriptorSetLayoutCreateInfo descLayoutInfo{
 	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &uboBinding};
@@ -74,7 +74,14 @@ Shader::Shader(const std::string &shaderPath) {
 	                                          .lineWidth = 1.0f};
 	VkPipelineMultisampleStateCreateInfo ms{.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 	                                        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT};
-	VkPipelineColorBlendAttachmentState cba{.colorWriteMask = 0xF};
+	VkPipelineColorBlendAttachmentState cba{.blendEnable = VK_TRUE,
+	                                        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+	                                        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+	                                        .colorBlendOp = VK_BLEND_OP_ADD,
+	                                        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+	                                        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+	                                        .alphaBlendOp = VK_BLEND_OP_ADD,
+	                                        .colorWriteMask = 0xF};
 	VkPipelineColorBlendStateCreateInfo cbs{
 	    .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cba};
 

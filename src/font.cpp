@@ -52,18 +52,19 @@ FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 		}
 	}
 
-	VkDescriptorSetLayoutBinding bindings[3] = {{.binding = 0,
-	                                             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-	                                             .descriptorCount = 1,
-	                                             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT},
-	                                            {.binding = 1,
-	                                             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-	                                             .descriptorCount = 1,
-	                                             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
-	                                            {.binding = 2,
-	                                             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-	                                             .descriptorCount = 1,
-	                                             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT}};
+	VkDescriptorSetLayoutBinding bindings[3] = {
+	    {.binding = 0,
+	     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	     .descriptorCount = 1,
+	     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT},
+	    {.binding = 1,
+	     .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+	     .descriptorCount = 1,
+	     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
+	    {.binding = 2,
+	     .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+	     .descriptorCount = 1,
+	     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT}};
 
 	VkDescriptorSetLayoutCreateInfo dsci{
 	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 3, .pBindings = bindings};
@@ -107,7 +108,6 @@ FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 	VkPipelineInputAssemblyStateCreateInfo ia{.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 	                                          .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
 
-	// Dynamic viewport and scissor for text clipping
 	VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 	VkPipelineDynamicStateCreateInfo dynamicState{.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
 	                                              .dynamicStateCount = 2,

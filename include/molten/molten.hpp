@@ -1,5 +1,7 @@
 #pragma once
 
+#include "molten/theme.hpp"
+#include "molten/ui.hpp"
 #include <functional>
 #include <string>
 
@@ -8,9 +10,9 @@
 
 class Molten final {
   private:
-	const std::string name;
-	const unsigned int width;
-	const unsigned int height;
+	std::string name;
+	unsigned int width;
+	unsigned int height;
 	GLFWwindow *window;
 
   public:
