@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <vector>
 
-Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
+Shader::Shader(const std::string &shaderPath) {
 	auto loadCode = [](const std::string &path) {
 		std::ifstream file(path, std::ios::ate | std::ios::binary);
 		if(!file.is_open()) throw std::runtime_error("Failed to open: " + path);
@@ -30,25 +30,32 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 		return mod;
 	};
 
-	auto vCode = loadCode(vertPath + ".vert.spv");
-	auto fCode = loadCode(fragPath + ".frag.spv");
-	VkShaderModule vMod = createMod(vCode);
-	VkShaderModule fMod = createMod(fCode);
+	auto code = loadCode(shaderPath + ".spv");
+	VkShaderModule shaderMod = createMod(code);
 
 	VkPipelineShaderStageCreateInfo stages[2] = {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 	                                              .stage = VK_SHADER_STAGE_VERTEX_BIT,
-	                                              .module = vMod,
-	                                              .pName = "main"},
+	                                              .module = shaderMod,
+	                                              .pName = "vs_main"},
 	                                             {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 	                                              .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-	                                              .module = fMod,
-	                                              .pName = "main"}};
+	                                              .module = shaderMod,
+	                                              .pName = "fs_main"}};
 
-	VkPushConstantRange push{
-	    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 40};
+	VkDescriptorSetLayoutBinding uboBinding{.binding = 0,
+	                                        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	                                        .descriptorCount = 1,
+	                                        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT};
+
+	VkDescriptorSetLayoutCreateInfo descLayoutInfo{
+	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &uboBinding};
+	vkCreateDescriptorSetLayout(Init::device, &descLayoutInfo, nullptr, &descSetLayout);
+
 	VkPipelineLayoutCreateInfo lci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-	                               .pushConstantRangeCount = 1,
-	                               .pPushConstantRanges = &push};
+	                               .setLayoutCount = 1,
+	                               .pSetLayouts = &descSetLayout,
+	                               .pushConstantRangeCount = 0,
+	                               .pPushConstantRanges = nullptr};
 	vkCreatePipelineLayout(Init::device, &lci, nullptr, &layout);
 
 	VkPipelineVertexInputStateCreateInfo vi{.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
@@ -87,13 +94,13 @@ Shader::Shader(const std::string &vertPath, const std::string &fragPath) {
 		throw std::runtime_error("Failed to create graphics pipeline!");
 	}
 
-	vkDestroyShaderModule(Init::device, vMod, nullptr);
-	vkDestroyShaderModule(Init::device, fMod, nullptr);
+	vkDestroyShaderModule(Init::device, shaderMod, nullptr);
 }
 
 Shader::~Shader() {
 	vkDestroyPipeline(Init::device, pipeline, nullptr);
 	vkDestroyPipelineLayout(Init::device, layout, nullptr);
+	vkDestroyDescriptorSetLayout(Init::device, descSetLayout, nullptr);
 }
 
 void Shader::use(VkCommandBuffer cmd) {

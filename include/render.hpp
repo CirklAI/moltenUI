@@ -1,11 +1,13 @@
 #pragma once
+
 #include "font.hpp"
-#include "shader.hpp"
-#include <memory>
+#include <functional>
+#include <glm/glm.hpp>
 
 namespace Render {
-extern std::unique_ptr<Shader> rectShader;
 extern std::unique_ptr<FontRenderer> fontRenderer;
-void draw_frame();
+
+void draw_frame(std::function<void()> callback);
+void draw_rect(float x, float y, float w, float h, glm::vec4 color);
 void cleanup();
 } // namespace Render

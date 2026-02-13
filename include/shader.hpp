@@ -8,8 +8,9 @@ class Shader {
 	VkPipelineLayout layout;
 	VkShaderModule vertModule;
 	VkShaderModule fragModule;
+	VkDescriptorSetLayout descSetLayout;
 
-	Shader(const std::string &vertPath, const std::string &fragPath);
+	Shader(const std::string &shaderPath);
 	~Shader();
 
 	void use(VkCommandBuffer cmd);

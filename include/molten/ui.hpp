@@ -11,4 +11,5 @@ inline State state;
 bool Button(int id, glm::vec2 pos, glm::vec2 size, const std::string &label);
 void InputField(int id, std::string &text, glm::vec2 pos, glm::vec2 size);
 void Text(const std::string &label, glm::vec2 pos, glm::vec4 color = glm::vec4(1.0f));
-} // namespace UI
+void update();
+}; // namespace UI

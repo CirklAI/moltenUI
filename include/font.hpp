@@ -25,6 +25,9 @@ class FontRenderer {
 	VkPipeline pipeline;
 	VkDescriptorSet descriptorSet;
 
+  public:
+	void reset_char_counter();
+
   private:
 	std::map<char, Glyph> glyphs;
 	VkImage atlasImage;
@@ -33,6 +36,13 @@ class FontRenderer {
 	VkSampler atlasSampler;
 	VkDescriptorSetLayout descLayout;
 	VkDescriptorPool descPool;
+	static const int MAX_FRAMES = 3;
+	static const int MAX_CHARS_PER_FRAME = 256;
+	VkBuffer uniformBuffers[MAX_FRAMES][MAX_CHARS_PER_FRAME];
+	VmaAllocation uniformAllocs[MAX_FRAMES][MAX_CHARS_PER_FRAME];
+	void *uniformMapped[MAX_FRAMES][MAX_CHARS_PER_FRAME];
+	VkDescriptorSet descriptorSets[MAX_FRAMES][MAX_CHARS_PER_FRAME];
+	int charCounters[MAX_FRAMES] = {0, 0, 0};
 
 	void create_atlas(const std::string &path, uint32_t fontSize);
 };

@@ -2,6 +2,10 @@
 
 namespace Input {
 void init(GLFWwindow *window) {
+	float xscale, yscale;
+	glfwGetWindowContentScale(window, &xscale, &yscale);
+	contentScale = {xscale, yscale};
+
 	glfwSetCursorPosCallback(window, [](GLFWwindow *, double x, double y) { mousePos = {(float)x, (float)y}; });
 
 	glfwSetMouseButtonCallback(window, [](GLFWwindow *, int button, int action, int mods) {
@@ -15,12 +19,24 @@ void init(GLFWwindow *window) {
 	glfwSetCharCallback(window, [](GLFWwindow *, unsigned int codepoint) { charBuffer += (char)codepoint; });
 }
 
-void update() {
+void update(GLFWwindow *window) {
+	float xscale, yscale;
+	glfwGetWindowContentScale(window, &xscale, &yscale);
+	contentScale = {xscale, yscale};
+
 	for(int i = 0; i < GLFW_MOUSE_BUTTON_LAST; i++)
 		mouseButtonsLast[i] = mouseButtons[i];
 	for(int i = 0; i < GLFW_KEY_LAST; i++)
 		keysLast[i] = keys[i];
 	charBuffer.clear();
+}
+
+glm::vec2 get_mouse_pos() {
+	return mousePos;
+}
+
+glm::vec2 get_content_scale() {
+	return contentScale;
 }
 
 bool is_key_down(int key) {
@@ -42,7 +58,8 @@ bool is_mouse_pressed(int button) {
 }
 
 bool is_hovered(glm::vec2 pos, glm::vec2 size) {
-	return mousePos.x >= pos.x && mousePos.x <= pos.x + size.x && mousePos.y >= pos.y && mousePos.y <= pos.y + size.y;
+	glm::vec2 m = get_mouse_pos();
+	return m.x >= pos.x && m.x <= pos.x + size.x && m.y >= pos.y && m.y <= pos.y + size.y;
 }
 
 std::string get_chars() {

@@ -4,8 +4,9 @@ project(moltenUI CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(EXE_NAME ${PROJECT_NAME})
-set(ASSET_BIN_DIR "$<TARGET_FILE_DIR:${EXE_NAME}>/assets")
+set(LIB_NAME ${PROJECT_NAME})
+set(EXE_NAME moltenUI_demo)
+set(ASSET_BIN_DIR "$<TARGET_FILE_DIR:${LIB_NAME}>/assets")
 find_package(Vulkan REQUIRED)
 find_package(glfw3 3.4 REQUIRED)
 find_package(Freetype REQUIRED)
@@ -14,49 +15,63 @@ FetchContent_Declare(fetch_vk_bootstrap GIT_REPOSITORY https://github.com/charle
 FetchContent_Declare(fetch_vma GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator GIT_TAG master)
 FetchContent_MakeAvailable(fetch_vk_bootstrap fetch_vma)
 
-add_executable(${EXE_NAME} 
-    src/main.cpp 
-    src/init.cpp 
-    src/render.cpp 
-    src/utils/render.cpp 
+include_directories(include)
+
+add_library(${LIB_NAME} 
+    src/lib.cpp
+    src/init.cpp
+    src/render.cpp
     src/shader.cpp
     src/ui.cpp
     src/components/input.cpp
     src/font.cpp
 )
 
-target_include_directories(${EXE_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+target_include_directories(${LIB_NAME} PRIVATE
     ${FREETYPE_INCLUDE_DIRS}
 )
-target_compile_options(${EXE_NAME} PRIVATE -Wno-nullability-completeness)
-target_link_libraries(${EXE_NAME} PRIVATE Vulkan::Vulkan glfw vk-bootstrap::vk-bootstrap VulkanMemoryAllocator ${FREETYPE_LIBRARIES})
+target_compile_options(${LIB_NAME} PRIVATE -Wno-nullability-completeness)
+target_link_libraries(${LIB_NAME} PUBLIC Vulkan::Vulkan glfw vk-bootstrap::vk-bootstrap VulkanMemoryAllocator ${FREETYPE_LIBRARIES})
 
-find_program(GLSLC_EXECUTABLE glslc REQUIRED)
+add_executable(${EXE_NAME} demo/main.cpp)
+target_link_libraries(${EXE_NAME} PRIVATE ${LIB_NAME})
+
+find_program(NAGA_EXECUTABLE naga)
+find_program(GLSLC_EXECUTABLE glslc)
+
+if(NOT NAGA_EXECUTABLE AND NOT GLSLC_EXECUTABLE)
+    message(FATAL_ERROR "Neither naga nor glslc found. Install one of them.")
+endif()
+
 set(SHADER_FILES
-    shaders/rect.vert
-    shaders/rect.frag
-    shaders/text.vert
-    shaders/text.frag
+    shaders/rect.wgsl
+    shaders/text.wgsl
 )
 
 set(SHADER_BIN_DIR "$<TARGET_FILE_DIR:${EXE_NAME}>/shaders")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shaders_temp")
 
 foreach(SHADER ${SHADER_FILES})
-    get_filename_component(FILE_NAME ${SHADER} NAME)
+    get_filename_component(FILE_NAME ${SHADER} NAME_WE)
     set(SPIRV_OUT "${CMAKE_CURRENT_BINARY_DIR}/shaders_temp/${FILE_NAME}.spv")
     
-    add_custom_command(
-        OUTPUT ${SPIRV_OUT}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_BIN_DIR}
-        COMMAND ${GLSLC_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER} -o ${SHADER_BIN_DIR}/${FILE_NAME}.spv
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
-        VERBATIM
-    )
+    if(NAGA_EXECUTABLE)
+        add_custom_command(
+            OUTPUT ${SPIRV_OUT}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_BIN_DIR}
+            COMMAND ${NAGA_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER} ${SHADER_BIN_DIR}/${FILE_NAME}.spv
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER}
+            VERBATIM
+        )
+    else()
+        message(ERROR "install naga to compile shaders")
+    endif()
+    
     list(APPEND SPIRV_BINARY_FILES ${SPIRV_OUT})
 endforeach()
+
+add_custom_target(shaders ALL DEPENDS ${SPIRV_BINARY_FILES})
+add_dependencies(${EXE_NAME} shaders)
 
 add_custom_target(compile_shaders ALL DEPENDS ${SPIRV_BINARY_FILES})
 add_dependencies(${EXE_NAME} compile_shaders)

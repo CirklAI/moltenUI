@@ -19,7 +19,8 @@
         "semps",
         "SPIR",
         "Subpasses",
-        "swapchain"
+        "swapchain",
+        "wgsl"
     ],
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true

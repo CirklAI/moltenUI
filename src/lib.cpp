@@ -1,3 +1,4 @@
+#include "molten/molten.hpp"
 // clang-format off
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -8,15 +9,25 @@
 #include "vk_mem_alloc.h"
 #include <iostream>
 
-#define TITLE "Balls"
-int main() {
+Molten::Molten(const std::string name, const unsigned int width, const unsigned int height)
+    : name(name), width(width), height(height), window(nullptr) {}
+
+Molten::~Molten() {
+	Init::cleanup_vulkan();
+	glfwDestroyWindow(window);
+	glfwTerminate();
+}
+
+int Molten::init() {
 	if(!glfwInit()) {
 		std::cerr << "Failed to initialize GLFW" << std::endl;
 		return -1;
 	}
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow *window = glfwCreateWindow(800, 600, TITLE, NULL, NULL);
+
+	window = glfwCreateWindow(this->width, this->height, this->name.c_str(), NULL, NULL);
+
 	if(window == NULL) {
 		std::cerr << "Failed to create GLFW window" << std::endl;
 		glfwTerminate();
@@ -24,16 +35,17 @@ int main() {
 	}
 
 	Input::init(window);
-	Init::init_vulkan(TITLE, window);
+	Init::init_vulkan(name.c_str(), window);
+
+	return 0;
+}
+
+int Molten::run(std::function<void()> callback) const {
 	while(!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		Render::draw_frame();
+		Render::draw_frame(callback);
+		Input::update(window);
 	}
-
-	Init::cleanup_vulkan();
-
-	glfwDestroyWindow(window);
-	glfwTerminate();
 
 	return 0;
 }

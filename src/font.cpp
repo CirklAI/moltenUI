@@ -1,7 +1,19 @@
 #include "font.hpp"
+#include "components/input.hpp"
 #include "init.hpp"
 #include <fstream>
 #include <vector>
+
+struct TextUBO {
+	glm::vec2 pos;
+	glm::vec2 size;
+	glm::vec4 color;
+	glm::vec4 uvRect;
+	glm::vec2 resolution;
+};
+
+const int MAX_FRAMES = 3;
+const int MAX_CHARS_PER_FRAME = 256;
 
 static std::vector<char> readFile(const std::string &filename) {
 	std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -25,35 +37,71 @@ static VkShaderModule createModule(const std::vector<char> &code) {
 FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 	create_atlas(fontPath, fontSize);
 
-	VkDescriptorSetLayoutBinding binding{.binding = 0,
-	                                     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	                                     .descriptorCount = 1,
-	                                     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT};
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_CHARS_PER_FRAME; i++) {
+			VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			                       .size = sizeof(TextUBO),
+			                       .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT};
+			VmaAllocationCreateInfo aci{.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			                                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
+			                            .usage = VMA_MEMORY_USAGE_AUTO};
+			VmaAllocationInfo allocInfo;
+			vmaCreateBuffer(Init::allocator, &bci, &aci, &uniformBuffers[frame][i], &uniformAllocs[frame][i],
+			                &allocInfo);
+			uniformMapped[frame][i] = allocInfo.pMappedData;
+		}
+	}
+
+	VkDescriptorSetLayoutBinding bindings[3] = {{.binding = 0,
+	                                             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	                                             .descriptorCount = 1,
+	                                             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT},
+	                                            {.binding = 1,
+	                                             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+	                                             .descriptorCount = 1,
+	                                             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT},
+	                                            {.binding = 2,
+	                                             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+	                                             .descriptorCount = 1,
+	                                             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT}};
+
 	VkDescriptorSetLayoutCreateInfo dsci{
-	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &binding};
+	    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 3, .pBindings = bindings};
 	vkCreateDescriptorSetLayout(Init::device, &dsci, nullptr, &descLayout);
 
-	VkPushConstantRange push{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = 48};
 	VkPipelineLayoutCreateInfo plci{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 	                                .setLayoutCount = 1,
 	                                .pSetLayouts = &descLayout,
-	                                .pushConstantRangeCount = 1,
-	                                .pPushConstantRanges = &push};
+	                                .pushConstantRangeCount = 0,
+	                                .pPushConstantRanges = nullptr};
 	vkCreatePipelineLayout(Init::device, &plci, nullptr, &pipelineLayout);
 
-	auto vCode = readFile("shaders/text.vert.spv");
-	auto fCode = readFile("shaders/text.frag.spv");
-	VkShaderModule vMod = createModule(vCode);
-	VkShaderModule fMod = createModule(fCode);
+	auto loadCode = [](const std::string &path) {
+		std::ifstream file(path, std::ios::ate | std::ios::binary);
+		if(!file.is_open()) throw std::runtime_error("Failed to open: " + path);
+		size_t fileSize = (size_t)file.tellg();
+		std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+		file.seekg(0);
+		file.read(reinterpret_cast<char *>(buffer.data()), fileSize);
+		return buffer;
+	};
+
+	auto code = loadCode("shaders/text.spv");
+
+	VkShaderModuleCreateInfo ci{.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+	                            .codeSize = code.size() * sizeof(uint32_t),
+	                            .pCode = code.data()};
+	VkShaderModule shaderMod;
+	vkCreateShaderModule(Init::device, &ci, nullptr, &shaderMod);
 
 	VkPipelineShaderStageCreateInfo stages[2] = {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 	                                              .stage = VK_SHADER_STAGE_VERTEX_BIT,
-	                                              .module = vMod,
-	                                              .pName = "main"},
+	                                              .module = shaderMod,
+	                                              .pName = "vs_main"},
 	                                             {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 	                                              .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-	                                              .module = fMod,
-	                                              .pName = "main"}};
+	                                              .module = shaderMod,
+	                                              .pName = "fs_main"}};
 
 	VkPipelineVertexInputStateCreateInfo vi{.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
 	VkPipelineInputAssemblyStateCreateInfo ia{.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -97,31 +145,56 @@ FontRenderer::FontRenderer(const std::string &fontPath, uint32_t fontSize) {
 		throw std::runtime_error("Failed to create text graphics pipeline!");
 	}
 
-	vkDestroyShaderModule(Init::device, vMod, nullptr);
-	vkDestroyShaderModule(Init::device, fMod, nullptr);
+	vkDestroyShaderModule(Init::device, shaderMod, nullptr);
 
-	VkDescriptorPoolSize poolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1};
+	VkDescriptorPoolSize poolSizes[3] = {
+	    {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = MAX_FRAMES * MAX_CHARS_PER_FRAME},
+	    {.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = MAX_FRAMES * MAX_CHARS_PER_FRAME},
+	    {.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = MAX_FRAMES * MAX_CHARS_PER_FRAME}};
 	VkDescriptorPoolCreateInfo pci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-	                               .maxSets = 1,
-	                               .poolSizeCount = 1,
-	                               .pPoolSizes = &poolSize};
+	                               .maxSets = MAX_FRAMES * MAX_CHARS_PER_FRAME,
+	                               .poolSizeCount = 3,
+	                               .pPoolSizes = poolSizes};
 	vkCreateDescriptorPool(Init::device, &pci, nullptr, &descPool);
 
-	VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-	                               .descriptorPool = descPool,
-	                               .descriptorSetCount = 1,
-	                               .pSetLayouts = &descLayout};
-	vkAllocateDescriptorSets(Init::device, &ai, &descriptorSet);
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_CHARS_PER_FRAME; i++) {
+			VkDescriptorSetLayout layout = descLayout;
+			VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			                               .descriptorPool = descPool,
+			                               .descriptorSetCount = 1,
+			                               .pSetLayouts = &layout};
+			vkAllocateDescriptorSets(Init::device, &ai, &descriptorSets[frame][i]);
 
-	VkDescriptorImageInfo imageInfo{
-	    .sampler = atlasSampler, .imageView = atlasView, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-	VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-	                           .dstSet = descriptorSet,
-	                           .dstBinding = 0,
-	                           .descriptorCount = 1,
-	                           .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-	                           .pImageInfo = &imageInfo};
-	vkUpdateDescriptorSets(Init::device, 1, &write, 0, nullptr);
+			VkDescriptorBufferInfo bufferInfo{
+			    .buffer = uniformBuffers[frame][i], .offset = 0, .range = sizeof(TextUBO)};
+
+			VkDescriptorImageInfo imageInfo{.imageView = atlasView,
+			                                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+
+			VkDescriptorImageInfo samplerInfo{.sampler = atlasSampler};
+
+			VkWriteDescriptorSet writes[3] = {{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			                                   .dstSet = descriptorSets[frame][i],
+			                                   .dstBinding = 0,
+			                                   .descriptorCount = 1,
+			                                   .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			                                   .pBufferInfo = &bufferInfo},
+			                                  {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			                                   .dstSet = descriptorSets[frame][i],
+			                                   .dstBinding = 1,
+			                                   .descriptorCount = 1,
+			                                   .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+			                                   .pImageInfo = &imageInfo},
+			                                  {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			                                   .dstSet = descriptorSets[frame][i],
+			                                   .dstBinding = 2,
+			                                   .descriptorCount = 1,
+			                                   .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+			                                   .pImageInfo = &samplerInfo}};
+			vkUpdateDescriptorSets(Init::device, 3, writes, 0, nullptr);
+		}
+	}
 }
 
 FontRenderer::~FontRenderer() {
@@ -132,6 +205,11 @@ FontRenderer::~FontRenderer() {
 	vkDestroyDescriptorSetLayout(Init::device, descLayout, nullptr);
 	vkDestroyPipeline(Init::device, pipeline, nullptr);
 	vkDestroyPipelineLayout(Init::device, pipelineLayout, nullptr);
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_CHARS_PER_FRAME; i++) {
+			vmaDestroyBuffer(Init::allocator, uniformBuffers[frame][i], uniformAllocs[frame][i]);
+		}
+	}
 }
 
 void FontRenderer::create_atlas(const std::string &path, uint32_t fontSize) {
@@ -250,19 +328,36 @@ void FontRenderer::create_atlas(const std::string &path, uint32_t fontSize) {
 
 void FontRenderer::draw_text(VkCommandBuffer cmd, const std::string &text, glm::vec2 pos, glm::vec4 color) {
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+
 	float x = pos.x;
+	int frame = Init::currentFrame;
+	glm::vec2 scale = Input::get_content_scale();
+
 	for(char c : text) {
+		if(charCounters[frame] >= MAX_CHARS_PER_FRAME) break;
 		if(glyphs.find(c) == glyphs.end()) continue;
 		Glyph &g = glyphs[c];
 		float xpos = x + g.bearing.x;
 		float ypos = pos.y - g.bearing.y;
-		struct {
-			glm::vec2 p, s;
-			glm::vec4 c, uv;
-		} pc{{xpos, ypos}, g.size, color, g.uvRect};
-		vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+
+		int idx = charCounters[frame];
+		TextUBO *ubo = static_cast<TextUBO *>(uniformMapped[frame][idx]);
+		ubo->pos = {xpos * scale.x, ypos * scale.y};
+		ubo->size = {g.size.x * scale.x, g.size.y * scale.y};
+		ubo->color = color;
+		ubo->uvRect = g.uvRect;
+		ubo->resolution = {(float)Init::vkbSwapchain.extent.width, (float)Init::vkbSwapchain.extent.height};
+
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[frame][idx],
+		                        0, nullptr);
 		vkCmdDraw(cmd, 6, 1, 0, 0);
 		x += g.advance;
+		charCounters[frame]++;
+	}
+}
+
+void FontRenderer::reset_char_counter() {
+	for(int i = 0; i < MAX_FRAMES; i++) {
+		charCounters[i] = 0;
 	}
 }
