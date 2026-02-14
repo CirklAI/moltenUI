@@ -1,0 +1,14 @@
+[target.x86_64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,/usr/local/lib",
+    "-C", "link-arg=-Wl,-rpath,/opt/homebrew/lib",
+    "-C", "link-arg=-Wl,-rpath,/Users/thoq/VulkanSDK/1.4.341.0/macOS/lib"
+]
+
+[target.aarch64-apple-darwin]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,/usr/local/lib",
+    "-C", "link-arg=-Wl,-rpath,/opt/homebrew/lib",
+    "-C", "link-arg=-Wl,-rpath,/Users/thoq/VulkanSDK/1.4.341.0/macOS/lib"
+]
+
