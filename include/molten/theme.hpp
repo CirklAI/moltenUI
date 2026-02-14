@@ -40,7 +40,6 @@ void set_theme(const ThemeData &theme);
 
 ThemeData create_dark_theme();
 ThemeData create_purple_theme();
-ThemeData create_light_theme();
 
 } // namespace Theme
 } // namespace UI
