@@ -3,11 +3,13 @@
 #include "font.hpp"
 #include <functional>
 #include <glm/glm.hpp>
+#include <vector>
 
 namespace Render {
 
 extern std::unique_ptr<FontRenderer> fontRenderer;
 
+void init_shaders_with_data(const std::vector<uint32_t> &rectSpirv, const std::vector<uint32_t> &roundedRectSpirv);
 void draw_frame(std::function<void()> callback);
 void draw_rect(float x, float y, float w, float h, glm::vec4 color);
 void draw_rounded_rect(float x, float y, float w, float h, float radius, glm::vec4 color);

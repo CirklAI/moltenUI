@@ -7,6 +7,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(LIB_NAME ${PROJECT_NAME})
 set(EXE_NAME moltenUI_demo)
 set(ASSET_BIN_DIR "$<TARGET_FILE_DIR:${LIB_NAME}>/assets")
+set(MOLTEN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
 find_package(Vulkan REQUIRED)
 find_package(glfw3 3.4 REQUIRED)
 find_package(Freetype REQUIRED)
@@ -38,6 +40,46 @@ target_link_libraries(${LIB_NAME} PUBLIC Vulkan::Vulkan glfw vk-bootstrap::vk-bo
 add_executable(${EXE_NAME} demo/main.cpp)
 target_link_libraries(${EXE_NAME} PRIVATE ${LIB_NAME})
 target_include_directories(${EXE_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
+
+add_library(molten_wrapper STATIC src/wrapper.cpp)
+
+target_include_directories(molten_wrapper PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${MOLTEN_INCLUDE_DIR}
+    ${Vulkan_INCLUDE_DIRS}
+    ${FREETYPE_INCLUDE_DIRS}
+)
+
+target_link_libraries(molten_wrapper PUBLIC
+    ${LIB_NAME}
+    glfw
+    Vulkan::Vulkan
+    Freetype::Freetype
+)
+
+if(APPLE)
+    target_link_libraries(molten_wrapper PUBLIC
+        "-framework Cocoa"
+        "-framework IOKit"
+        "-framework CoreVideo"
+        "-framework QuartzCore"
+        "-framework Metal"
+    )
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(molten_wrapper PUBLIC
+        dl
+        pthread
+        X11
+        Xxf86vm
+        Xrandr
+        Xi
+    )
+endif()
+
+set_target_properties(molten_wrapper PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
 
 find_program(NAGA_EXECUTABLE naga)
 find_program(GLSLC_EXECUTABLE glslc)
@@ -87,3 +129,4 @@ add_custom_command(
             ${CMAKE_CURRENT_SOURCE_DIR}/assets ${ASSET_BIN_DIR}
     COMMENT "Copying assets to build directory..."
 )
+

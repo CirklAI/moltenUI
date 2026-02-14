@@ -44,10 +44,112 @@ VkDescriptorPool roundedDescPool;
 VkDescriptorSet roundedDescriptorSets[MAX_FRAMES][MAX_RECTS_PER_FRAME];
 int roundedRectCounters[MAX_FRAMES] = {0, 0, 0};
 
+bool shadersInitialized = false;
+
 void init_resources() {
+	if(shadersInitialized) return;
+
 	rectShader = std::make_unique<Shader>("shaders/rect");
 	roundedRectShader = std::make_unique<Shader>("shaders/rounded_rect");
+	fontRenderer = std::make_unique<FontRenderer>("../assets/fonts/GoogleSans-Regular.ttf", 14);
+	shadersInitialized = true;
+
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
+			VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			                       .size = sizeof(RectUBO),
+			                       .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT};
+			VmaAllocationCreateInfo aci{.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			                                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
+			                            .usage = VMA_MEMORY_USAGE_AUTO};
+			VmaAllocationInfo allocInfo;
+			vmaCreateBuffer(Init::allocator, &bci, &aci, &uniformBuffers[frame][i], &uniformAllocs[frame][i],
+			                &allocInfo);
+			uniformMapped[frame][i] = allocInfo.pMappedData;
+		}
+	}
+
+	VkDescriptorPoolSize poolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	                              .descriptorCount = MAX_FRAMES * MAX_RECTS_PER_FRAME};
+	VkDescriptorPoolCreateInfo pci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+	                               .maxSets = MAX_FRAMES * MAX_RECTS_PER_FRAME,
+	                               .poolSizeCount = 1,
+	                               .pPoolSizes = &poolSize};
+	vkCreateDescriptorPool(Init::device, &pci, nullptr, &descPool);
+
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
+			VkDescriptorSetLayout layout = rectShader->descSetLayout;
+			VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			                               .descriptorPool = descPool,
+			                               .descriptorSetCount = 1,
+			                               .pSetLayouts = &layout};
+			vkAllocateDescriptorSets(Init::device, &ai, &descriptorSets[frame][i]);
+
+			VkDescriptorBufferInfo bufferInfo{
+			    .buffer = uniformBuffers[frame][i], .offset = 0, .range = sizeof(RectUBO)};
+			VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			                           .dstSet = descriptorSets[frame][i],
+			                           .dstBinding = 0,
+			                           .descriptorCount = 1,
+			                           .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			                           .pBufferInfo = &bufferInfo};
+			vkUpdateDescriptorSets(Init::device, 1, &write, 0, nullptr);
+		}
+	}
+
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
+			VkBufferCreateInfo bci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			                       .size = sizeof(RoundedRectUBO),
+			                       .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT};
+			VmaAllocationCreateInfo aci{.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			                                     VMA_ALLOCATION_CREATE_MAPPED_BIT,
+			                            .usage = VMA_MEMORY_USAGE_AUTO};
+			VmaAllocationInfo allocInfo;
+			vmaCreateBuffer(Init::allocator, &bci, &aci, &roundedUniformBuffers[frame][i],
+			                &roundedUniformAllocs[frame][i], &allocInfo);
+			roundedUniformMapped[frame][i] = allocInfo.pMappedData;
+		}
+	}
+
+	VkDescriptorPoolSize roundedPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+	                                     .descriptorCount = MAX_FRAMES * MAX_RECTS_PER_FRAME};
+	VkDescriptorPoolCreateInfo roundedPci{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+	                                      .maxSets = MAX_FRAMES * MAX_RECTS_PER_FRAME,
+	                                      .poolSizeCount = 1,
+	                                      .pPoolSizes = &roundedPoolSize};
+	vkCreateDescriptorPool(Init::device, &roundedPci, nullptr, &roundedDescPool);
+
+	for(int frame = 0; frame < MAX_FRAMES; frame++) {
+		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
+			VkDescriptorSetLayout layout = roundedRectShader->descSetLayout;
+			VkDescriptorSetAllocateInfo ai{.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			                               .descriptorPool = roundedDescPool,
+			                               .descriptorSetCount = 1,
+			                               .pSetLayouts = &layout};
+			vkAllocateDescriptorSets(Init::device, &ai, &roundedDescriptorSets[frame][i]);
+
+			VkDescriptorBufferInfo bufferInfo{
+			    .buffer = roundedUniformBuffers[frame][i], .offset = 0, .range = sizeof(RoundedRectUBO)};
+			VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			                           .dstSet = roundedDescriptorSets[frame][i],
+			                           .dstBinding = 0,
+			                           .descriptorCount = 1,
+			                           .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			                           .pBufferInfo = &bufferInfo};
+			vkUpdateDescriptorSets(Init::device, 1, &write, 0, nullptr);
+		}
+	}
+}
+
+void init_shaders_with_data(const std::vector<uint32_t> &rectSpirv, const std::vector<uint32_t> &roundedRectSpirv) {
+	if(shadersInitialized) return;
+
+	rectShader = std::make_unique<Shader>(rectSpirv);
+	roundedRectShader = std::make_unique<Shader>(roundedRectSpirv);
 	fontRenderer = std::make_unique<FontRenderer>("assets/fonts/GoogleSans-Regular.ttf", 14);
+	shadersInitialized = true;
 
 	for(int frame = 0; frame < MAX_FRAMES; frame++) {
 		for(int i = 0; i < MAX_RECTS_PER_FRAME; i++) {
